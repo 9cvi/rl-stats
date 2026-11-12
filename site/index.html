@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rocket League Coach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2; --surface-1: #fcfcfb; --surface-2: #efeeea; --border: #dcdbd5;
+  --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #77766f;
+  --series-1: #2a78d6; --series-2: #eb6834; --grid: #e6e5e0;
+  --good: #0b7a3e; --bad: #c0362c; --accent: #2a78d6;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --surface-1: #1a1a19; --surface-2: #232321; --border: #33332f;
+    --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+    --series-1: #3987e5; --series-2: #d95926; --grid: #2b2b28;
+    --good: #4cc27f; --bad: #ef6f62; --accent: #3987e5;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface-1: #1a1a19; --surface-2: #232321; --border: #33332f;
+  --text-primary: #f0efec; --text-secondary: #c3c2b7; --text-muted: #8f8e86;
+  --series-1: #3987e5; --series-2: #d95926; --grid: #2b2b28;
+  --good: #4cc27f; --bad: #ef6f62; --accent: #3987e5;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text-primary); font: 15px/1.5 Inter, system-ui, sans-serif; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 24px 16px 64px; }
+h1, h2 { font-family: "Barlow Condensed", Inter, sans-serif; letter-spacing: .02em; margin: 0; }
+h1 { font-size: 36px; line-height: 1.1; }
+h2 { font-size: 22px; margin-bottom: 12px; }
+.sub { color: var(--text-secondary); margin-top: 4px; }
+header { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+.filters { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 20px; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; }
+.seg button { border: 0; background: transparent; color: var(--text-secondary); font: 500 13px Inter, sans-serif; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--surface-1); color: var(--text-primary); box-shadow: 0 1px 2px rgb(0 0 0 / .12); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+.tile .label { color: var(--text-secondary); font-size: 13px; }
+.tile .val { font: 700 34px/1.1 "Barlow Condensed", Inter, sans-serif; margin: 4px 0; }
+.tile .cmp { font-size: 12.5px; color: var(--text-muted); }
+.good { color: var(--good); } .bad { color: var(--bad); }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+@media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+.focus li { margin-bottom: 12px; }
+.focus b { display: block; }
+.focus span { color: var(--text-secondary); font-size: 14px; }
+.chart-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+select { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; font: 14px Inter, sans-serif; }
+.legend { display: flex; gap: 14px; font-size: 13px; color: var(--text-secondary); margin-bottom: 6px; }
+.legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+.chart-box { position: relative; height: 280px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th { color: var(--text-secondary); font-weight: 500; font-size: 12.5px; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.scroll { overflow-x: auto; }
+.pill { font-size: 12px; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); color: var(--text-secondary); }
+a { color: var(--accent); }
+.empty { padding: 40px; text-align: center; color: var(--text-secondary); }
+footer { color: var(--text-muted); font-size: 12.5px; margin-top: 28px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 id="title">Rocket League Coach</h1>
+      <div class="sub" id="updated">Loading…</div>
+    </div>
+  </header>
+
+  <div class="filters" role="group" aria-label="Filters">
+    <div class="seg" data-key="mode"><button data-v="all">All modes</button><button data-v="1">1v1</button><button data-v="2">2v2</button><button data-v="3">3v3</button></div>
+    <div class="seg" data-key="type"><button data-v="all">All</button><button data-v="ranked">Ranked</button><button data-v="casual">Casual</button></div>
+    <div class="seg" data-key="range"><button data-v="10">Last 10</button><button data-v="25">Last 25</button><button data-v="50">Last 50</button><button data-v="0">All</button></div>
+  </div>
+
+  <div id="main"></div>
+
+  <footer>Data from your private ballchasing.com uploads. Rebuilt automatically every day. Compared against the opponents in the same games.</footer>
+</div>
+
+<script>
+const METRICS = {
+  zero_boost:  { label: "Time on zero boost", unit: "%", better: "low",  tip: "Grab small pads on every path and stop boosting once you're already at full speed." },
+  big_pads:    { label: "Big boost pads / game", unit: "", better: "high", tip: "Rotate back through a corner big pad instead of straight up the middle." },
+  avg_boost:   { label: "Average boost held", unit: "", better: "high", tip: "Keep 30+ boost before you challenge. Small pads on the way back add up." },
+  supersonic:  { label: "Time supersonic", unit: "%", better: "high", tip: "Boost until supersonic, then let go. Speed gets you to the ball and back on defence first." },
+  slow:        { label: "Time moving slowly", unit: "%", better: "low",  tip: "Avoid stopping and turning in place. Powerslide and keep moving." },
+  behind_ball: { label: "Time behind the ball", unit: "%", better: "high", tip: "Stay goal-side of the ball unless you're the one taking it." },
+  def_third:   { label: "Time in defensive third", unit: "%", better: null, tip: "" },
+  closest:     { label: "Closest to ball", unit: "%", better: null, tip: "" },
+  high_air:    { label: "Time high in the air", unit: "%", better: "high", tip: "10–15 min of aerial training packs before you queue." },
+  saves:       { label: "Saves / game", unit: "", better: "high", tip: "Rotate back far post so you're facing the ball when it comes." },
+  assists:     { label: "Assists / game", unit: "", better: "high", tip: "Pass to the middle for your teammate instead of shooting from bad angles." },
+  goals:       { label: "Goals / game", unit: "", better: "high", tip: "Practise power shots and shooting to the corners in free play." },
+  shots:       { label: "Shots / game", unit: "", better: "high", tip: "" },
+  score:       { label: "Score / game", unit: "", better: "high", tip: "" },
+  bpm:         { label: "Boost used / min", unit: "", better: null, tip: "" },
+  avg_speed:   { label: "Average speed", unit: "", better: "high", tip: "" },
+  demos:       { label: "Demos / game", unit: "", better: "high", tip: "" },
+};
+const TILES = ["zero_boost", "big_pads", "supersonic", "behind_ball", "saves"];
+const FOCUSABLE = ["zero_boost","big_pads","avg_boost","supersonic","slow","behind_ball","high_air","saves","assists","goals"];
+
+const state = { mode: "all", type: "all", range: "25", metric: "zero_boost" };
+try { Object.assign(state, JSON.parse(localStorage.getItem("rl-filters") || "{}")); } catch (e) {}
+let DATA = null, chart = null;
+
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const avg = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+const fmt = (v, m) => v == null ? "–" : (Math.abs(v) >= 100 ? Math.round(v) : v.toFixed(1)) + (METRICS[m]?.unit || "");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const playlistName = p => p.replace(/-/g, " ").replace(/\b\w/g, c => c.toUpperCase());
+
+function filtered() {
+  let g = DATA.games.filter(x =>
+    (state.mode === "all" || String(x.team_size) === state.mode) &&
+    (state.type === "all" || (state.type === "ranked") === x.ranked));
+  const r = +state.range;
+  return r ? g.slice(-r) : g;
+}
+const meAvg = (g, m) => avg(g.map(x => x.me[m]));
+const oppAvg = (g, m) => avg(g.filter(x => x.opps).map(x => x.opps[m]));
+const mateAvg = (g, m) => { const h = g.filter(x => x.mates); return h.length ? avg(h.map(x => x.mates[m])) : null; };
+
+function judge(m, me, opp) {
+  const b = METRICS[m].better; if (!b || !opp) return "";
+  const good = b === "high" ? me >= opp : me <= opp;
+  return good ? "good" : "bad";
+}
+
+function render() {
+  document.querySelectorAll(".seg").forEach(seg => seg.querySelectorAll("button").forEach(b =>
+    b.setAttribute("aria-pressed", String(state[seg.dataset.key] === b.dataset.v))));
+  try { localStorage.setItem("rl-filters", JSON.stringify({ mode: state.mode, type: state.type, range: state.range, metric: state.metric })); } catch (e) {}
+  const g = filtered(), main = document.getElementById("main");
+  if (!g.length) { main.innerHTML = '<div class="card empty">No games match these filters yet.</div>'; return; }
+
+  const wins = g.filter(x => x.win).length;
+  let html = '<div class="tiles">';
+  html += `<div class="card tile"><div class="label">Record</div><div class="val">${wins}–${g.length - wins}</div><div class="cmp">${Math.round(100 * wins / g.length)}% wins · ${g.length} games</div></div>`;
+  for (const m of TILES) {
+    const me = meAvg(g, m), op = oppAvg(g, m), j = judge(m, me, op);
+    html += `<div class="card tile"><div class="label">${METRICS[m].label}</div><div class="val">${fmt(me, m)}</div><div class="cmp">opponents <span class="${j}">${fmt(op, m)}</span> ${j === "good" ? "✓ better" : j === "bad" ? "✗ worse" : ""}</div></div>`;
+  }
+  html += "</div>";
+
+  // Focus areas: biggest relative gaps vs opponents
+  const gaps = FOCUSABLE.map(m => {
+    const me = meAvg(g, m), op = oppAvg(g, m), b = METRICS[m].better;
+    if (!op) return null;
+    const gap = b === "high" ? (op - me) / op : (me - op) / op;
+    return { m, me, op, gap };
+  }).filter(x => x && x.gap > 0.05 && METRICS[x.m].tip).sort((a, b) => b.gap - a.gap).slice(0, 3);
+  html += '<div class="grid2"><div class="card"><h2>Fix these first</h2>';
+  html += gaps.length ? '<ol class="focus">' + gaps.map(x =>
+    `<li><b>${METRICS[x.m].label}: ${fmt(x.me, x.m)} (opponents ${fmt(x.op, x.m)})</b><span>${METRICS[x.m].tip}</span></li>`).join("") + "</ol>"
+    : "<p>You're level with or better than your opponents on every key stat in these games. Time to rank up.</p>";
+  html += "</div>";
+
+  html += '<div class="card"><div class="chart-head"><h2 style="margin:0">Trend</h2><select id="metric" aria-label="Metric">' +
+    Object.keys(METRICS).map(m => `<option value="${m}" ${m === state.metric ? "selected" : ""}>${METRICS[m].label}</option>`).join("") +
+    '</select></div><div class="legend"><span><i style="background:var(--series-1)"></i>You (5-game average)</span><span><i style="background:var(--series-2)"></i>Opponents (5-game average)</span></div><div class="chart-box"><canvas id="trend" aria-label="Trend chart"></canvas></div></div></div>';
+
+  html += '<div class="card" style="margin-bottom:20px"><h2>You vs teammates vs opponents</h2><div class="scroll"><table><thead><tr><th>Stat</th><th class="num">You</th><th class="num">Teammates</th><th class="num">Opponents</th></tr></thead><tbody>';
+  for (const m of Object.keys(METRICS)) {
+    const me = meAvg(g, m), op = oppAvg(g, m), mt = mateAvg(g, m), j = judge(m, me, op);
+    html += `<tr><td>${METRICS[m].label}</td><td class="num ${j}">${fmt(me, m)}</td><td class="num">${fmt(mt, m)}</td><td class="num">${fmt(op, m)}</td></tr>`;
+  }
+  html += "</tbody></table></div></div>";
+
+  html += '<div class="card"><h2>Recent games</h2><div class="scroll"><table><thead><tr><th>Date</th><th>Playlist</th><th>Result</th><th class="num">G/A/Sv/Sh</th><th class="num">Zero boost</th><th class="num">Supersonic</th><th></th></tr></thead><tbody>';
+  for (const x of g.slice().reverse().slice(0, 30)) {
+    const d = new Date(x.date);
+    html += `<tr><td>${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })} ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}</td>
+      <td><span class="pill">${esc(playlistName(x.playlist))}</span></td>
+      <td class="${x.win ? "good" : "bad"}">${x.win ? "Win" : "Loss"} ${x.gf}–${x.ga}${x.overtime ? " OT" : ""}</td>
+      <td class="num">${x.me.goals}/${x.me.assists}/${x.me.saves}/${x.me.shots}</td>
+      <td class="num">${fmt(x.me.zero_boost, "zero_boost")}</td><td class="num">${fmt(x.me.supersonic, "supersonic")}</td>
+      <td><a href="https://ballchasing.com/replay/${esc(x.id)}" target="_blank" rel="noopener">Replay</a></td></tr>`;
+  }
+  html += "</tbody></table></div></div>";
+  main.innerHTML = html;
+
+  document.getElementById("metric").onchange = e => { state.metric = e.target.value; render(); };
+  drawChart(g);
+}
+
+function rolling(a, w = 5) { return a.map((_, i) => { const s = a.slice(Math.max(0, i - w + 1), i + 1).filter(v => v != null); return s.length ? +avg(s).toFixed(2) : null; }); }
+
+function drawChart(g) {
+  const m = state.metric;
+  const labels = g.map(x => new Date(x.date).toLocaleDateString(undefined, { month: "short", day: "numeric" }));
+  const me = rolling(g.map(x => x.me[m])), op = rolling(g.map(x => x.opps ? x.opps[m] : null));
+  if (chart) chart.destroy();
+  if (typeof Chart === "undefined") { document.querySelector(".chart-box").innerHTML = '<p class="sub">The chart library could not load. Refresh the page.</p>'; return; }
+  const grid = css("--grid"), muted = css("--text-muted");
+  chart = new Chart(document.getElementById("trend"), {
+    type: "line",
+    data: { labels, datasets: [
+      { label: "You", data: me, borderColor: css("--series-1"), backgroundColor: css("--series-1"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .3 },
+      { label: "Opponents", data: op, borderColor: css("--series-2"), backgroundColor: css("--series-2"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: .3 },
+    ]},
+    options: {
+      maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      plugins: { legend: { display: false }, tooltip: { callbacks: {
+        title: items => { const x = g[items[0].dataIndex]; return `${items[0].label} · ${playlistName(x.playlist)} · ${x.win ? "Win" : "Loss"} ${x.gf}–${x.ga}`; },
+        label: it => ` ${it.dataset.label}: ${fmt(it.parsed.y, m)}` } } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: muted, maxTicksLimit: 6, autoSkip: true } },
+        y: { grid: { color: grid }, border: { display: false }, ticks: { color: muted, maxTicksLimit: 5 } },
+      },
+    },
+  });
+}
+
+document.querySelectorAll(".seg").forEach(seg => seg.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return; state[seg.dataset.key] = b.dataset.v; render();
+}));
+
+fetch("data.json", { cache: "no-store" }).then(r => { if (!r.ok) throw new Error(r.status); return r.json(); }).then(d => {
+  DATA = d;
+  document.getElementById("title").textContent = `${d.player} · Rocket League Coach`;
+  document.getElementById("updated").textContent = `${d.games.length} games analysed · updated ${new Date(d.updated).toLocaleString()}`;
+  try { render(); } catch (e) { console.error(e); }
+}).catch(() => { document.getElementById("updated").textContent = "No data yet. The first daily update hasn't run."; });
+</script>
+</body>
+</html>
