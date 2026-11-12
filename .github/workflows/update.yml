@@ -1,0 +1,50 @@
+name: Daily stats update
+
+on:
+  schedule:
+    - cron: "17 22 * * *"   # every day at 02:17 Dubai time
+  workflow_dispatch: {}      # "Run workflow" button for a manual update
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Fetch stats from ballchasing
+        env:
+          BALLCHASING_TOKEN: ${{ secrets.BALLCHASING_TOKEN }}
+          PLAYER_NAMES: ${{ vars.PLAYER_NAMES || 'Display_Wave' }}
+        run: python build.py
+      - name: Save game cache
+        run: |
+          git config user.name "stats-bot"
+          git config user.email "stats-bot@users.noreply.github.com"
+          git add data/games.json
+          git diff --cached --quiet || git commit -m "Update game cache [skip ci]"
+          git push
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
